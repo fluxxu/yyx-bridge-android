@@ -1,0 +1,5 @@
+.vscode
+/bridge-arm/target
+/bridge-x86/target
+/target
+**/*.rs.bk
