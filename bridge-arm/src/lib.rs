@@ -3,6 +3,8 @@ use std::ffi::{CString};
 use std::mem::transmute;
 use std::io::Error;
 
+mod assets;
+
 #[cfg(not(debug_assertions))]
 macro_rules! debug {
   ($($expr:expr),*) => {
@@ -55,7 +57,7 @@ extern "C" fn _init() {
     let run: PyRun_SimpleStringFlags = transmute(libc::dlsym(handle, sym.as_ptr()));
     debug!("PyRun_SimpleStringFlags addr = {:?}", run);
 
-    let code_cstr = CString::new(include_str!("./code.py")).unwrap();
+    let code_cstr = CString::new(assets::get_code()).unwrap();
     let gil = ensure();
     let rv = run(code_cstr.as_ptr(), 0);
     release(gil);

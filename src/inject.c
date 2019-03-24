@@ -265,14 +265,14 @@ int remote_load_lib(struct remove_load_lib_params *params)
 {
   const uint32_t stack_size = 0x10000;
   uint32_t code_size = get_code_length();
-  void *code_addr = get_code_addr();
   uint32_t lib_path_size = strlen(params->lib_path) + 1;
   uint32_t buf_size = stack_size + code_size + lib_path_size;
 
-  printf("code addr = 0x%x\n", (uint32_t)code_addr);
-  printf("code size = 0x%x\n", code_size);
-  printf("lib path size = 0x%x\n", lib_path_size);
-  printf("buf size = 0x%x\n", buf_size);
+  // void *code_addr = get_code_addr();
+  // printf("code addr = 0x%x\n", (uint32_t)code_addr);
+  // printf("code size = 0x%x\n", code_size);
+  // printf("lib path size = 0x%x\n", lib_path_size);
+  // printf("buf size = 0x%x\n", buf_size);
 
   // for (uint32_t i = 0; i < code_size; i++)
   // {

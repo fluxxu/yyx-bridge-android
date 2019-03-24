@@ -26,7 +26,10 @@ const REMOTE_MEM_SIZE: u32 = 0x11000;
 const LIBC_PATH: &str = "/system/lib/libc.so";
 const LINKER_PATH: &str = "/system/bin/linker";
 const INJECT_LIB_PATH: &str = "/vendor/libyyxbridge_x86.so";
-const PACKAGE_NAME: &str = "com.netease.onmyoji";
+const PACKAGE_NAMES: &[&str] = &[
+    "com.netease.onmyoji.netease_simulator",
+    "com.netease.onmyoji",
+];
 
 #[cfg(not(debug_assertions))]
 macro_rules! debug {
@@ -122,7 +125,7 @@ fn find_target_pid() -> Result<Option<pid_t>, Error> {
     let procs = list_procs()?;
     Ok(procs
         .iter()
-        .find(|p| p.cmdline == PACKAGE_NAME)
+        .find(|p| PACKAGE_NAMES.contains(&(&p.cmdline as &str)))
         .map(|p| p.pid))
 }
 
@@ -207,9 +210,12 @@ fn main() {
         };
         print!(r#"{{"error":"{}"}}"#, msg.replace("\"", "\\\""))
     }
+    cleanup_files();
 }
 
 fn run() -> Result<(), Error> {
+    extract_files()?;
+
     unsafe {
         let self_pid = libc::getpid();
 
@@ -218,8 +224,6 @@ fn run() -> Result<(), Error> {
         debug!("pid = {}", pid);
 
         let pipe_worker = thread::spawn(move || wait_data(pid));
-
-        let remote_libs = get_proc_libs(pid)?;
 
         let local_libc_base = get_proc_lib_base(self_pid, LIBC_PATH)?
             .ok_or_else(|| Error::Msg(format!("Local libc was not found.")))?;
@@ -253,22 +257,25 @@ fn run() -> Result<(), Error> {
         let mmap_symbol = CString::new("mmap").unwrap();
         let mmap = libc::dlsym(local_libc, mmap_symbol.as_ptr());
         debug!("mmap: 0x{:x}", mmap as u32);
-        let mmap_addr = mmap as u32;
-        debug!(
-            "mmap lib: {:?}",
+        debug!("mmap lib: {:?}", {
+            let mmap_addr = mmap as u32;
             get_proc_libs(self_pid)?
                 .iter()
                 .find(|l| l.range_start <= mmap_addr && l.range_end > mmap_addr)
-        );
+        });
 
         let remote_mmap_addr: u32 = remote_libc_base + (mmap as u32 - local_libc_base);
         debug!("remote_mmap_addr: 0x{:x}", remote_mmap_addr);
-        debug!(
-            "remote mmap lib: {:?}",
-            remote_libs
-                .iter()
-                .find(|l| l.range_start <= remote_mmap_addr && l.range_end > remote_mmap_addr)
-        );
+
+        #[cfg(debug_asserts)]
+        {
+            let remote_libs = get_proc_libs(pid)?;
+            debug!("remote mmap lib: {:?}", {
+                remote_libs
+                    .iter()
+                    .find(|l| l.range_start <= remote_mmap_addr && l.range_end > remote_mmap_addr)
+            });
+        }
 
         assert!(ptrace_attach(pid));
         debug!("ptrace attached");
@@ -340,4 +347,52 @@ fn wait_data(pid: pid_t) -> Result<String, Error> {
     let content = fs::read_to_string(&fifo_path)?;
     fs::remove_file(&fifo_path)?;
     Ok(content)
+}
+
+#[cfg(debug_assertions)]
+fn extract_files() -> Result<(), Error> {
+    Ok(())
+}
+
+#[cfg(debug_assertions)]
+fn cleanup_files() {}
+
+#[cfg(not(debug_assertions))]
+const INJECT_LIB_ARM_PATH: &str = "/vendor/libyyxbridge_arm.so";
+
+#[cfg(not(debug_assertions))]
+fn extract_files() -> Result<(), Error> {
+    use std::fs;
+    fs::remove_file(INJECT_LIB_PATH).ok();
+    fs::remove_file(INJECT_LIB_ARM_PATH).ok();
+    fs::write(
+        INJECT_LIB_PATH,
+        include_bytes!("../bridge-x86/target/i686-linux-android/release/libbridge_x86.so")
+            as &[u8],
+    )?;
+    fs::write(
+        INJECT_LIB_ARM_PATH,
+        include_bytes!("../bridge-arm/target/armv7-linux-androideabi/release/libbridge_arm.so")
+            as &[u8],
+    )?;
+    Ok(())
+}
+
+#[cfg(not(debug_assertions))]
+fn cleanup_files() {
+    use std::fs;
+    use std::time::Duration;
+
+    for _ in 0..3 {
+        if fs::remove_file(INJECT_LIB_PATH)
+            .ok()
+            .into_iter()
+            .chain(fs::remove_file(INJECT_LIB_ARM_PATH).ok().into_iter())
+            .count()
+            == 2
+        {
+            break;
+        }
+        thread::sleep(Duration::from_secs(1));
+    }
 }
