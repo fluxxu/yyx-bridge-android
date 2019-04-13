@@ -9,7 +9,7 @@ fn main() {
   let out_dir = env::var("OUT_DIR").unwrap();
   
   let out_dir_path = Path::new(&out_dir);
-  let content = fs::read_to_string("./assets/code.py").unwrap();
+  let content = fs::read_to_string("./assets/code_guild.py").unwrap();
   let content_bytes = content.as_bytes();
   let mut rng = rand::thread_rng();
   let lines: Vec<(u8, String)> = content_bytes.iter().enumerate()
