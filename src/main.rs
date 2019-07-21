@@ -26,10 +26,7 @@ const REMOTE_MEM_SIZE: u32 = 0x11000;
 const LIBC_PATH: &str = "/system/lib/libc.so";
 const LINKER_PATH: &str = "/system/bin/linker";
 const INJECT_LIB_PATH: &str = "/vendor/libyyxbridge_x86.so";
-const PACKAGE_NAMES: &[&str] = &[
-    "com.netease.onmyoji.netease_simulator",
-    "com.netease.onmyoji",
-];
+const PACKAGE_PREFIX: &str = "com.netease.onmyoji";
 
 #[cfg(not(debug_assertions))]
 macro_rules! debug {
@@ -125,7 +122,7 @@ fn find_target_pid() -> Result<Option<pid_t>, Error> {
     let procs = list_procs()?;
     Ok(procs
         .iter()
-        .find(|p| PACKAGE_NAMES.contains(&(&p.cmdline as &str)))
+        .find(|p| p.cmdline == PACKAGE_PREFIX || p.cmdline.starts_with(PACKAGE_PREFIX))
         .map(|p| p.pid))
 }
 
